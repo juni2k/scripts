@@ -1,0 +1,26 @@
+#!/usr/bin/env perl
+# martin, 2018-10-03
+# ... cleans up a jpeg.
+
+use strict;
+use warnings;
+use utf8;
+
+sub main {
+  for (@ARGV) {
+    print "processing $_\n";
+
+    my @cmd = (
+      'gm', 'mogrify',
+      '-strip',
+      '-interlace', 'Plane',
+      '-auto-orient',
+      '-quality', '90%',
+      $_,
+    );
+    system(@cmd) == 0 or die "@cmd failed: $?";
+  }
+}
+
+main();
+

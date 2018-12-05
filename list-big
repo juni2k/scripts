@@ -1,0 +1,6 @@
+#!/usr/bin/sh
+# martin, 2018-11-16
+# ... lists biggest files in workdir
+
+find -type f -exec du -Sh {} + | sort -rh | head -n 5
+

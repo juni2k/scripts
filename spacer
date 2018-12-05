@@ -1,0 +1,14 @@
+#!/usr/bin/env perl
+# martin, 2018-09-02
+
+use strict;
+use warnings;
+use utf8;
+
+binmode(STDIN, ':utf8');
+binmode(STDOUT, ':utf8');
+binmode(STDERR, ':utf8');
+
+print s/([^\s])/$1 /gr . "  " for @ARGV;
+print "\n";
+

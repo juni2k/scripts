@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# martin, 2018-07-08
+# ... queries external IP address using DuckDuckGo
+
+require "open-uri"
+
+case ARGV[0]
+when "--help"
+  puts "usage: #{$0} [--help|pure]"
+  exit
+when "--pure"
+  pure = true
+end
+
+res = open("https://duckduckgo.com/?q=my+ip&t=h_&ia=answer").read
+echo = res.scan(/(Your IP address is .*<\/a>)/)
+          .flatten.join("").gsub(/<.[^>]*>/, "")
+
+if pure
+  echo = echo.scan(/IP address is (.*) in/).flatten.first.to_s
+end
+
+puts echo
+
