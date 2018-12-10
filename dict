@@ -1,0 +1,42 @@
+#!/usr/bin/env perl
+# martin, 2018-12-10
+# ... asks dict.cc for a translation
+
+use strict;
+use warnings;
+use utf8;
+
+use Encode;
+use Mojo::UserAgent;
+use URI::Escape;
+
+exit unless @ARGV;
+binmode(STDIN,  ':utf8');
+binmode(STDOUT, ':utf8');
+binmode(STDERR, ':utf8');
+
+sub fetch_list {
+  my ($htmlref, $id) = @_;
+
+  return
+    map  { decode('UTF-8', $_) }
+    grep { $_ ne '' }
+    map  { s/\\'/'/g; $_ }
+    map  { s/(^"|"$)//g; $_ }
+    map  { /\((.*?)\);/; split /","/, $1 }
+    grep { /var c${id}Arr/ }
+    split /\n/, $$htmlref;
+}
+
+my $html =
+  Mojo::UserAgent->new
+    ->get('https://www.dict.cc/?s=' . uri_escape(@ARGV))
+    ->res
+    ->body;
+
+my @xs1 = fetch_list(\$html, 1);
+my @xs2 = fetch_list(\$html, 2);
+
+for (0..$#xs1) {
+  printf "%s –– %s\n", $xs1[$_], $xs2[$_];
+}
