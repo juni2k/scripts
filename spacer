@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
-# martin, 2018-09-02
+# martin, 2018-09-02, 2018-12-19
+# ./spacer hello => "h e l l o"
+# ./spacer -meme hello => "ｈｅｌｌｏ"
 
 use strict;
 use warnings;
@@ -9,6 +11,20 @@ binmode(STDIN, ':utf8');
 binmode(STDOUT, ':utf8');
 binmode(STDERR, ':utf8');
 
-print s/([^\s])/$1 /gr . "  " for @ARGV;
+sub spaced {
+  s/([^\s])/$1 /gr . "  "
+}
+
+sub fullwidth {
+  my $delta = ord('！') - ord('!');
+  my $fw = join('',  map { chr(ord($_) + $delta) } split(//, $_[0]));
+  return $fw;
+}
+
+if ($ARGV[0] =~ /--?meme/) {
+  print fullwidth($_) for @ARGV[1..$#ARGV];
+} else {
+  print spaced($_) for @ARGV;
+}
 print "\n";
 
