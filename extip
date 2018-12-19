@@ -1,24 +1,29 @@
-#!/usr/bin/env ruby
-# martin, 2018-07-08
-# ... queries external IP address using DuckDuckGo
+#!/usr/bin/env perl
+# martin, 2018-12-20
+# ... fetches external IPv4 address using DuckDuckGo
 
-require "open-uri"
+use strict;
+use warnings;
+use utf8;
 
-case ARGV[0]
-when "--help"
-  puts "usage: #{$0} [--help|pure]"
-  exit
-when "--pure"
-  pure = true
-end
+use Mojo::UserAgent;
 
-res = open("https://duckduckgo.com/?q=my+ip&t=h_&ia=answer").read
-echo = res.scan(/(Your IP address is .*<\/a>)/)
-          .flatten.join("").gsub(/<.[^>]*>/, "")
+sub DDG { 'https://duckduckgo.com/?q=my+ip&t=h_&ia=answer' }
+sub strip_tags { $_[0] =~ s/<.[^>]*>//gr }
 
-if pure
-  echo = echo.scan(/IP address is (.*) in/).flatten.first.to_s
-end
+my ($pure);
+for (@ARGV) {
+  if (/--?p(ure)?/) { $pure++ }
+  else { print "usage: $0 [--pure]\n"; exit }
+}
 
-puts echo
-
+my $html = Mojo::UserAgent->new->get(DDG)->result->body;
+if ($html =~ m@Your IP address is (?<info>(?<ip>.*?) in .*?</a>)@) {
+  if ($pure) {
+    print $+{ip}, "\n";
+  } else {
+    print strip_tags($+{info}), "\n";
+  }
+} else {
+  print "Segmentation fault (core dumped)\n"; # HEH
+}
