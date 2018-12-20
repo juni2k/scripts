@@ -1,0 +1,28 @@
+#!/usr/bin/env perl
+# ... displays a zenity notification after timeout
+# martin, 2018-12-11, 2018-12-20
+#
+# ./timer 10m30s Go to bed. &
+# ./timer     5s You have dementia. &
+# ./timer     1h This has been an hour. &
+# ... etc
+
+sub zenity {
+  qx/zenity --info --text='@_'/;
+}
+
+sub timeout {
+  my ($spec) = @_;
+
+  exit unless $spec =~ /((?<h>\d+)h)?((?<m>\d+)m)?((?<s>\d+)s)?$/;
+
+  my $timeout = 0;
+  $timeout += ($+{h} // 0) * 60 * 60;
+  $timeout += ($+{m} // 0) * 60;
+  $timeout += ($+{s} // 0);
+
+  sleep($timeout);
+}
+
+timeout $ARGV[0];
+zenity @ARGV[1..$#ARGV];
