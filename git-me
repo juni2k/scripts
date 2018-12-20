@@ -1,0 +1,28 @@
+#!/usr/bin/env perl
+# martin, 2018-12-20
+# ... prints committer info from .git/config
+
+use strict;
+use warnings;
+use utf8;
+
+use Cwd qw/getcwd/;
+use Mojo::File;
+
+sub extract_committer {
+  my ($data) = @_;
+  my %user =
+      grep { $_ }
+      map { /^\s*(\w+) = (.*)/; $1 => $2 }
+      split(/\n/, (
+          grep { /^user/ }
+          split(/\n?\[/, $data))[0]);
+  return %user;
+}
+
+my $conf = Mojo::File->new(getcwd)->child('.git/config');
+die "Looks like $conf does not exist\n" unless (-e $conf);
+
+my $data = $conf->slurp;
+my %committer = extract_committer($data);
+print "$committer{name} <$committer{email}>\n";
