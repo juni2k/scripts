@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# martin, 2018-12-20
+# martin, 2018-12-20, 2019-01-12
 # ... prints committer info from .git/config
 
 use strict;
@@ -10,15 +10,25 @@ use Cwd qw/getcwd/;
 use Mojo::File;
 
 sub extract_committer {
-  no warnings;
-  my ($data) = @_;
-  my %user =
-      grep { $_ }
-      map { /^\s*(\w+) = (.*)/; $1 => $2 }
-      split(/\n/, (
-          grep { /^user/ }
-          split(/\n?\[/, $data))[0]);
-  return %user;
+  my (@lines) = split(/\n/, shift);
+
+  my (%config, $current_key);
+  for (@lines) {
+    if (/^\[(.*?)\]$/) {
+      # like: "[core]"
+      $current_key = $1;
+    } elsif (/^\s*(.*?) = (.*?)$/) {
+      # like: "    bare = false"
+      $config{$current_key}->{$1} = $2;
+    }
+  }
+
+  unless (defined $config{user}->{email}
+          && defined $config{user}->{name}) {
+    die "Your .git/config does not seem to have a valid user entry\n";
+  }
+
+  return $config{user}->%*;
 }
 
 my $conf = Mojo::File->new(getcwd)->child('.git/config');
@@ -26,7 +36,4 @@ die "Looks like $conf does not exist\n" unless (-e $conf);
 
 my $data = $conf->slurp;
 my %committer = extract_committer($data);
-unless ($committer{name} && $committer{mail}) {
-  die "Looks like your git config is not initialised properly\n";
-}
 print "$committer{name} <$committer{email}>\n";
