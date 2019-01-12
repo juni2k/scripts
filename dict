@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# martin, 2018-12-10
+# martin, 2018-12-10, 2019-01-12
 # ... asks dict.cc for a translation
 
 use strict;
@@ -28,9 +28,10 @@ sub fetch_list {
     split /\n/, $$htmlref;
 }
 
+my $term = join(' ', @ARGV);
 my $html =
   Mojo::UserAgent->new
-    ->get('https://www.dict.cc/?s=' . uri_escape(@ARGV))
+    ->get('https://www.dict.cc/?s=' . uri_escape($term))
     ->res
     ->body;
 
