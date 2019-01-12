@@ -1,0 +1,32 @@
+#!/usr/bin/env perl
+# martin, 2019-01-12
+# recursively chmod cwd's folders to 0755 and files to 0644
+
+use strict;
+use warnings;
+
+use Cwd qw//;
+
+use Mojo::File;
+
+sub main {
+  my $cwd = Mojo::File->new(Cwd::getcwd);
+  print 'Fixing permissions for '.$cwd->realpath."\n";
+
+  my %list_opts = (
+    dir => 1
+  );
+  for my $node ($cwd->list_tree(\%list_opts)->each) {
+    my $mode;
+    if (-d $node) {
+      $mode = 0755;
+    } else {
+      $mode = 0644;
+    }
+
+    printf("[chmod %o] %s\n", $mode, $node);
+    $node->chmod($mode);
+  }
+}
+
+main;
