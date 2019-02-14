@@ -1,0 +1,6 @@
+#!/usr/bin/sh
+
+# martin, 2019-01-12
+# adapted from: https://wiki.voidlinux.org/Musl
+
+proot -R ~/void-glibc /bin/bash
