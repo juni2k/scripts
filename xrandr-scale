@@ -1,0 +1,95 @@
+#!/usr/bin/env perl
+
+# martin, 2019-02-15
+
+use strict;
+use warnings;
+use 5;
+
+my $scale = 1.6;
+
+sub make_xrandr_cmd {
+  my ($display, $mode, $override) = @_;
+
+  # $display is something like 'eDP1'
+  # $mode    is something like '2560x1440+0+0'
+
+  my ($w, $h) = split(/[\+x]/, $mode);
+
+  my $ratio = sprintf("%.2f", 2 / $scale);
+  my $fb_w = sprintf("%.0f", $w * $ratio);
+  my $fb_h = sprintf("%.0f", $h * $ratio);
+
+  my @cmd = (
+    "xrandr",
+    ($override ?
+     "--fb ${w}x${h}" :
+     "--fb ${fb_w}x${fb_h}"),
+    "--output $display",
+    ($override ?
+     "--panning ${w}x${h}" :
+     "--panning ${fb_w}x${fb_h}"),
+    "--scale ${ratio}x${ratio}"
+  );
+
+  return @cmd;
+}
+
+sub run_xrandr {
+  my ($display, $mode) = @_;
+
+  my @cmd = make_xrandr_cmd($display, $mode);
+  my $out = qx[@cmd 2>&1];
+
+  # Sometimes, due to incorrect rounding,
+  # xrandr emits a message like
+  # "screen not large enough for output ([recommended_mode])"
+  #
+  # In that case, go with the recommended mode
+  if ($out =~ /\((?<mode>[\d\+x]*)\)/) {
+    @cmd = make_xrandr_cmd($display, $+{mode}, 1);
+    qx[@cmd];
+  }
+
+  `mktemp --tmpdir xrandr-scale.XXXXXXXXXX`;
+
+  exit(0);
+}
+
+sub check_tempfile {
+  # Work out the tempdir
+  my $tempdir = `mktemp --tmpdir -u _1337_XXX` =~ s/_1337_.*//r;
+  chomp($tempdir);
+
+  my $tempglob = "${tempdir}xrandr-scale*";
+  my @tempfiles = glob($tempglob);
+  if (@tempfiles) {
+    print STDERR "It looks as if xrandr-scale has already been used\n";
+    print STDERR "in this session. Please remove the following files\n";
+    print STDERR "before continuing:";
+    print STDERR "\n- @{[ join(\"\n- \", @tempfiles) ]}\n";
+    exit(0);
+  }
+}
+
+sub main {
+  check_tempfile;
+
+  my @xrandr_out = split(qr[\n], `xrandr --current`);
+
+  # This is terrible, but I am tired...
+  for my $line (@xrandr_out) {
+    if ($line =~
+        /^(?<device>[^\s]+)\s
+        \Qconnected primary\E\s
+        (?<properties>[^\s]+)/x) {
+      run_xrandr($+{device}, $+{properties});
+    }
+  }
+
+  # This only runs if no line matched (also terrible!)
+  print STDERR "Could not fetch display properties from xrandr!\n";
+  print STDERR "output:\n".join("\n", @xrandr_out)."\n";
+}
+
+main;
