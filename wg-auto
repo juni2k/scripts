@@ -1,0 +1,34 @@
+#!/usr/bin/env perl
+
+# martin, 2019-03-19
+# a simple tool for calling wg-quick
+# without specifying a config file explicitly
+# (the first file from /etc/wireguard wil
+#  be taken)
+#
+# EXAMPLES:
+#   wg-auto up
+#   wg-auto down
+#
+# (It's really that fucking simple)
+
+use strict;
+use warnings;
+use v5.18;
+
+my $wg_conf_dir = '/etc/wireguard';
+my $wgq_bin     = '/bin/wg-quick';
+
+sub info {
+  print "[wg-auto] @_\n";
+}
+
+sub main {
+  die "Please specify [ up | down | ... ]\n" unless @ARGV;
+
+  my $conf = <$wg_conf_dir/*>;
+  info("applying $conf");
+  system($wgq_bin, $ARGV[0], $conf) == 0 or die "fail: $?\n";
+}
+
+main;
