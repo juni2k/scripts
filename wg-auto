@@ -3,14 +3,14 @@
 # martin, 2019-03-19
 # a simple tool for calling wg-quick
 # without specifying a config file explicitly
-# (the first file from /etc/wireguard wil
+# (the first file from /etc/wireguard will
 #  be taken)
 #
 # EXAMPLES:
 #   wg-auto up
 #   wg-auto down
 #
-# (It's really that fucking simple)
+# (It's really that simple)
 
 use strict;
 use warnings;
