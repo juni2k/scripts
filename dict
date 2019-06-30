@@ -1,13 +1,12 @@
 #!/usr/bin/env perl
-# martin, 2018-12-10, 2019-01-12
+# martin, 2018-12-10, 2019-01-12, 2019-06-30
 # ... asks dict.cc for a translation
 
 use strict;
 use warnings;
-use utf8;
+use v5;
 
 use Encode;
-use Mojo::UserAgent;
 use URI::Escape;
 
 exit unless @ARGV;
@@ -28,16 +27,16 @@ sub fetch_list {
     split /\n/, $$htmlref;
 }
 
+my @curl = qw(curl -s);
 my $term = join(' ', @ARGV);
-my $html =
-  Mojo::UserAgent->new
-    ->get('https://www.dict.cc/?s=' . uri_escape($term))
-    ->res
-    ->body;
+my $url = 'https://www.dict.cc/?s=' . uri_escape($term);
+
+my $html = qx(@curl $url);
+die "fail: $?" unless $? == 0;
 
 my @xs1 = fetch_list(\$html, 1);
 my @xs2 = fetch_list(\$html, 2);
 
 for (0..$#xs1) {
-  printf "%s –– %s\n", $xs1[$_], $xs2[$_];
+  printf "%s -- %s\n", $xs1[$_], $xs2[$_];
 }
