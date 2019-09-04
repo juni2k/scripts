@@ -1,0 +1,30 @@
+#!/usr/bin/env perl
+
+# martin, 2019-08-06
+
+# Expects getting something like
+# `git diff --numstat <commit1> <commit2>`
+# on STDIN.
+#
+# Prints something like
+# "Changed 17 files, added 145 lines, deleted 220 lines."
+
+use strict;
+use warnings;
+use v5.18;
+
+my ($filecount, $added, $deleted);
+
+while (my $line = <STDIN>) {
+  chomp($line);
+
+  $filecount++;
+
+  my ($a, $d) = $line =~ /^ (\d+) \s* (\d+) /x;
+  $added += $a;
+  $deleted += $d;
+}
+
+print "Changed $filecount files, ",
+  "added $added lines, ",
+  "deleted $deleted lines.\n";
