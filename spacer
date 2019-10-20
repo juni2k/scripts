@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
-# martin, 2018-09-02, 2018-12-19
+# martin, 2018-09-02, 2018-12-19, 2019-10-21
 # ./spacer hello => "h e l l o"
 # ./spacer -meme hello => "ｈｅｌｌｏ"
+# ./spacer -sponge i'm the bad guy... duh! => "i'm thE baD gUY... DUh!"
 
 use strict;
 use warnings;
@@ -21,10 +22,18 @@ sub fullwidth {
   return $fw;
 }
 
+sub spongecase {
+  return
+      join '',
+      map { rand >= 0.5 ? uc $_ : lc $_ }
+      split //, $_[0];
+}
+
 if ($ARGV[0] =~ /--?meme/) {
-  print fullwidth($_) for @ARGV[1..$#ARGV];
+  print fullwidth($_), " " for @ARGV[1..$#ARGV];
+} elsif ($ARGV[0] =~ /--?sponge/) {
+  print spongecase($_), " " for @ARGV[1..$#ARGV];
 } else {
   print spaced($_) for @ARGV;
 }
 print "\n";
-
