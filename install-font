@@ -1,0 +1,71 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use 5.18.0;
+
+use File::Basename qw(basename);
+use File::Copy qw(copy);
+use File::Path qw(make_path);
+use File::Spec;
+
+my $me = basename $0;
+
+sub print_usage {
+  print <<"EOF";
+Usage: ./$me FONT PATH
+
+Arguments:
+    FONT    Specifies the font file
+            (e.g. Helvetica.ttf)
+
+    PATH    Specifies the path where the font will be installed
+            (e.g. /usr/share/fonts/expensive-fonts)
+            Note: this path will be created if it does not exist.
+EOF
+}
+
+sub create_font_path {
+
+  my $path = shift;
+
+  unless (-d $path) {
+    print STDERR "Creating path: $path\n";
+    make_path($path, {chmod => 0755});
+  }
+}
+
+sub copy_font_file {
+
+  my $path = shift;
+  my $font = shift;
+
+  my $absfont = File::Spec->catfile($path, $font);
+
+  print STDERR "Copying font file: $font => $absfont\n";
+  copy($font, $absfont) or die "Copy failed: $!";
+
+  print STDERR "Applying chmod 0644 => $absfont\n";
+  my $changes = chmod 0644, $absfont;
+
+  if ($changes != 1) {
+    die "chmod failed, reporting $changes changed file(s)!";
+  }
+}
+
+sub main {
+  if (@ARGV != 2) {
+    print STDERR "$me expects two arguments!\n\n";
+    print_usage;
+    exit -1;
+  }
+
+  my ($font, $path) = @ARGV;
+
+  create_font_path($path);
+  copy_font_file($path => $font);
+
+  print STDERR "Done. Please run: fc-cache -vf\n";
+}
+
+main;
