@@ -18,8 +18,11 @@ sub spaced {
 
 sub fullwidth {
   my $delta = ord('！') - ord('!');
-  my $fw = join('',  map { chr(ord($_) + $delta) } split(//, $_[0]));
-  return $fw;
+
+  return
+      join  '',
+      map   { chr(ord($_) + $delta) }
+      split //, $_[0];
 }
 
 sub spongecase {
@@ -30,7 +33,7 @@ sub spongecase {
 }
 
 if ($ARGV[0] =~ /--?meme/) {
-  print fullwidth($_), " " for @ARGV[1..$#ARGV];
+  print fullwidth($_), "　" for @ARGV[1..$#ARGV];
 } elsif ($ARGV[0] =~ /--?sponge/) {
   print spongecase($_), " " for @ARGV[1..$#ARGV];
 } else {
