@@ -1,12 +1,10 @@
 #!/usr/bin/env perl
-# martin, 2018-12-20, 2019-01-12, 2019-11-17
-# ... prints committer info from .git/config
+# martin, 2018-12-20, 2019-01-12, 2019-11-17, 2019-11-19
+# locates and prints committer info from .git/config
 
 use strict;
 use warnings;
 use utf8;
-
-use Cwd qw/getcwd/;
 
 sub extract_committer {
   my (@lines) = split(/\n/, shift);
@@ -33,7 +31,13 @@ sub extract_committer {
 my $data = do {
   local $/ = undef;
 
-  my $fn = getcwd . '/.git/config';
+  my $root = `git rev-parse --show-toplevel`;
+  if ($? != 0) {
+    die "Fatal: $!";
+  }
+  $root =~ s/[\r\n]$//g;
+
+  my $fn = $root . '/.git/config';
   unless (-e $fn) {
     die "File $fn does not exist\n";
   }
