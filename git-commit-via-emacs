@@ -1,0 +1,4 @@
+#!/bin/sh
+
+export EDITOR='emacs -nw'
+git commit
