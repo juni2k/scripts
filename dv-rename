@@ -1,0 +1,90 @@
+#!/usr/bin/env perl
+#
+# martin, 2020-07-22
+#
+# dv-rename renames .dv files using the 'Recorded date' tag
+# returned by MediaInfo. Make sure the 'mediainfo' binary
+# is in your path.
+#
+# Usage:
+# ./dv-rename *.dv      # dry run
+# ./dv-rename -f *.dv   # serious run
+
+use strict;
+use warnings;
+use 5;
+
+use File::Basename qw/basename dirname/;
+use File::Copy qw/move/;
+use File::Spec::Functions qw/catfile/;
+use IPC::Open2 qw/open2/;
+
+sub sanitize_recdate {
+  my $date = shift;
+
+  chomp $date;
+
+  # Replace spaces with a dot
+  $date =~ s/\s+/./g;
+
+  # Replace double colons with dashes
+  $date =~ s/:/-/g;
+
+  # Remove '.000' if present
+  $date =~ s/\.000\b//g;
+
+  return $date;
+}
+
+sub rename_file {
+  my $fn = shift;
+  my $mode = shift;
+
+  my $dry = 0;
+
+  if (defined $mode and $mode eq 'dry-run') {
+    $dry = 1;
+  }
+
+  my $fndir = dirname $fn;
+  my $fnbase = basename $fn;
+
+  my $pid = open2(my $child_out, my $child_in,
+                  mediainfo => '--Output=General;%Recorded_Date%',
+                  $fn);
+
+  my $recdate = sanitize_recdate(readline $child_out);
+
+  waitpid($pid, 0);
+
+  my $rc = $? >> 8;
+  if ($rc != 0) {
+    die "Fatal: mediainfo exited with status $rc\n";
+  }
+
+  my $newbase = "$recdate.dv";
+  my $newpath = catfile($fndir, $newbase);
+
+  print "[Rename:] $fn => $newpath\n";
+
+  if (!$dry) {
+    move($fn, $newpath);
+  }
+}
+
+sub main {
+  if ($ARGV[0] ne '-f') {
+    # Dry run mode
+    print "[Mode:] Using dry run mode to preview changes!\n";
+    my @files = @ARGV;
+    rename_file($_, 'dry-run') for @files;
+    print "This has been a dry run, use -f to commit.\n";
+  } else {
+    # Serious mode
+    shift @ARGV;
+    my @files = @ARGV;
+    rename_file($_) for @files;
+  }
+}
+
+main;
