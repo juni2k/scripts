@@ -1,4 +1,9 @@
 #!/bin/sh
 
 export EDITOR='emacs -nw'
-git commit
+if [ -z "$1" ]; then
+	git commit
+	exit
+fi
+
+git commit "$*"
