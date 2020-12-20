@@ -11,10 +11,7 @@ use Encode;
 use Mojo::UserAgent;
 use URI::Escape;
 
-exit unless @ARGV;
-binmode(STDIN,  ':utf8');
-binmode(STDOUT, ':utf8');
-binmode(STDERR, ':utf8');
+use open qw(:std :utf8);
 
 sub fetch_list {
   my ($htmlref, $id) = @_;
@@ -29,20 +26,47 @@ sub fetch_list {
     split /\n/, $$htmlref;
 }
 
-my $term = join(' ', @ARGV);
-my $url = 'https://www.dict.cc/?s=' . uri_escape($term);
+sub lookup {
+  my $term = join(' ', @_);
+  my $url = 'https://www.dict.cc/?s=' . uri_escape($term);
 
-my $res = Mojo::UserAgent->new->get($url)->res;
+  my $res = Mojo::UserAgent->new->get($url)->res;
 
-if ($res->code != 200) {
-  die "dict.cc returned: " . $res->code . "\n";
+  if ($res->code != 200) {
+    die "dict.cc returned: " . $res->code . "\n";
+  }
+
+  my $html = $res->body;
+
+  my @xs1 = fetch_list(\$html, 1);
+  my @xs2 = fetch_list(\$html, 2);
+
+  for (0..$#xs1) {
+    printf "%s -- %s\n", $xs1[$_], $xs2[$_];
+  }
 }
 
-my $html = $res->body;
+sub show_help {
+  print <<'EOF';
+Usage: dict [-h | words...]
+Look up a German/English translation in dict.cc
 
-my @xs1 = fetch_list(\$html, 1);
-my @xs2 = fetch_list(\$html, 2);
+Example: dict talk to the hand
 
-for (0..$#xs1) {
-  printf "%s -- %s\n", $xs1[$_], $xs2[$_];
+This file is part of Martin's scripts.
+<https://github.com/nanont/scripts>
+
+Licensed under MIT.
+EOF
 }
+
+sub main {
+  if (!(scalar @ARGV) or $ARGV[0] =~ /--?h(elp)?/) {
+    show_help;
+    exit;
+  }
+
+  lookup(@ARGV);
+}
+
+main;
