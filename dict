@@ -1,12 +1,14 @@
 #!/usr/bin/env perl
-# martin, 2018-12-10, 2019-01-12, 2019-06-30
-# ... asks dict.cc for a translation
+# martin, 2018-12-10, 2019-01-12, 2019-06-30, 2020-12-20
+# ... ask dict.cc for a translation
 
 use strict;
 use warnings;
 use v5;
 
 use Encode;
+
+use Mojo::UserAgent;
 use URI::Escape;
 
 exit unless @ARGV;
@@ -27,12 +29,16 @@ sub fetch_list {
     split /\n/, $$htmlref;
 }
 
-my @curl = qw(curl -s);
 my $term = join(' ', @ARGV);
 my $url = 'https://www.dict.cc/?s=' . uri_escape($term);
 
-my $html = qx(@curl $url);
-die "fail: $?" unless $? == 0;
+my $res = Mojo::UserAgent->new->get($url)->res;
+
+if ($res->code != 200) {
+  die "dict.cc returned: " . $res->code . "\n";
+}
+
+my $html = $res->body;
 
 my @xs1 = fetch_list(\$html, 1);
 my @xs2 = fetch_list(\$html, 2);
