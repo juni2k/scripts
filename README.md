@@ -6,6 +6,13 @@ This has grown in an anarchistic way. Some scripts have -h / -u for
 printing usage information, some don't. When in doubt, read the source
 code.
 
+## dict
+
+Look up a German/English translation in dict.cc
+
+Usage: `dict [-h | words...]`  
+Example: `dict talk to the hand`
+
 # License
 
 This software is Copyright (c) 2019 by Martin Frederic.
