@@ -1,0 +1,11 @@
+#!/bin/sh
+
+export XSECURELOCK_BLANK_TIMEOUT=900
+export XSECURELOCK_FONT=unifont
+export XSECURELOCK_PASSWORD_PROMPT=disco
+export XSECURELOCK_SAVER=saver_xscreensaver
+export XSECURELOCK_SAVER_RESET_ON_AUTH_CLOSE=1
+export XSECURELOCK_SHOW_DATETIME=1
+exec xsecurelock
+
+
