@@ -1,0 +1,475 @@
+#!/usr/bin/env perl
+
+# This is a Kitchen Sink Tool for Last.fm
+# (C) 2021 Martin Frederic
+
+use strict;
+use warnings;
+use v5.18;
+
+# = BEGIN COMMON FUNCTIONS =
+
+use Carp           qw{croak};
+use Digest::MD5    qw{md5_hex};
+use Encode         qw{decode};
+use File::Basename qw{basename dirname};
+use File::Path     qw{make_path};
+use Pod::Usage     qw{pod2usage};
+
+use LWP::UserAgent qw{};
+use JSON           qw{decode_json};
+use URI::Escape    qw{uri_escape_utf8};
+use XML::LibXML;
+
+use open qw{:std :utf8};
+
+use Data::Dumper;
+$Data::Dumper::Maxdepth = 2;
+$Data::Dumper::Sortkeys = 1;
+
+my $api_base = 'https://ws.audioscrobbler.com/2.0/';
+
+sub make_api_url {
+  return $api_base unless @_;
+  my %args = @_;
+
+  my $full = $api_base;
+  my $sep = '?';
+
+  for my $key (sort keys %args) {
+    my $val = $args{$key};
+
+    $full .= $sep;
+    $full .= uri_escape_utf8($key) . '=' . uri_escape_utf8($val);
+
+    $sep = '&';
+  }
+
+  return $full;
+}
+
+sub make_api_signature {
+  my $secret = shift;
+  my %args = @_;
+
+  my $s;
+
+  # Keys need to be sorted!
+  # Fascists...
+  for my $key (sort keys %args) {
+    my $val = $args{$key};
+
+    $s .= $key . $val;
+  }
+
+  $s .= $secret;
+
+  utf8::encode($s);
+  return md5_hex($s);
+}
+
+sub api_request {
+
+  my $ua         = shift;
+  my $url        = shift;
+  my $method     = shift || '';
+
+  my $res;
+  if ($method eq 'POST') {
+    $res = $ua->post($url);
+  } else {
+    $res = $ua->get($url);
+  }
+
+  if ($res->is_success) {
+    # We're done here!
+    return $res->decoded_content;
+  }
+
+  # Even if we didn't get a 200 OK, the Last.fm API might have
+  # returned something useful as JSON.
+
+  # Might contain a "useful" error message later on.
+  my ($api_err, $err_msg);
+
+  eval {
+    $api_err = decode_json($res->decoded_content);
+    $err_msg = sprintf "API error #%d: %s [%s]",
+        $api_err->{error}, $api_err->{message}, $url;
+  };
+  if ($@) {
+    # OK, nothing useful here, seems like a fundamental error.
+    print STDERR "Did not receive a valid JSON response!\n";
+    print STDERR $res->decoded_content, "\n";
+    die $res->status_line;
+  } else {
+    if ($api_err->{error} == 8) {
+      # 8 is "Operation failed - Something else went wrong"
+      print $err_msg, "\nRetrying...\n";
+      sleep 5;
+      return __SUB__->($ua, $url);
+    }
+
+    die $api_err;
+  }
+}
+
+sub get_auth_token {
+  my $ua   = shift;
+  my $conf = get_config();
+
+  my %args = (
+    method  => 'auth.getToken',
+    api_key => $conf->{api}->{key},
+    format  => 'json'
+  );
+
+  my $sig = make_api_signature($conf->{api}->{secret}, %args);
+  my $url = make_api_url(%args, api_sig => $sig);
+
+  my $json = api_request($ua, $url);
+  my $data = decode_json $json;
+
+  return $data->{token};
+}
+
+sub get_auth_session {
+  my $ua    = shift;
+  my $token = shift;
+  my $conf  = get_config();
+
+  my %args = (
+    method  => 'auth.getSession',
+    api_key => $conf->{api}->{key},
+    token   => $token
+
+    # Note: no format => json allowed here... oh well.
+  );
+
+  my $sig = make_api_signature($conf->{api}->{secret}, %args);
+  my $url = make_api_url(%args, api_sig => $sig);
+
+  my $xml = api_request($ua, $url);
+
+  # TODO: unify XML parsing (that is: not use regexes!!1!11)
+  my $res = $xml =~ m@<key>([[:alnum:]_-]+)</key>@;
+  if ($res) {
+    my $key = $1;
+    return $key;
+  } else {
+    die "Could not extract key from XML, got:\n\n$xml\n";
+  }
+}
+
+sub request_user_auth {
+  my $token = shift;
+  my $config = get_config();
+
+  my $api_key = $config->{api}->{key};
+
+  my $url = "http://www.last.fm/api/auth/"
+      . "?api_key=$api_key&token=$token";
+
+  print STDERR "Authentication request! Point your browser to:\n";
+  print STDERR $url, "\n";
+}
+
+sub get_sk {
+  my $ua   = shift;
+  my $user = shift;
+
+  # Build path to cache file
+  die "Missing env: \$HOME\n" unless exists $ENV{HOME};
+  # say STDERR $ENV{HOME};
+
+  my $cache_dn = "$ENV{HOME}/.cache/lastfm-tools";
+  my $cache_fn = "$cache_dn/$user.session";
+  my $sk;
+
+  if (-e -f $cache_fn) {
+    # cache file exists, read sk from it!
+
+    $sk = read_utf8($cache_fn);
+    # print STDERR "Read sk: $sk\n";
+  } else {
+    # cache file does not exist, create it
+
+    my $token = get_auth_token($ua);
+    request_user_auth($token);
+    print STDERR "(Hit RETURN to continue.)\n";
+    <STDIN>;
+    $sk = get_auth_session($ua, $token);
+
+    make_path($cache_dn);
+    write_utf8($cache_fn, $sk);
+
+    print STDERR "Session stored at $cache_fn\n";
+  }
+
+  return $sk;
+}
+
+sub scrobble {
+  my $ua    = shift;
+  my $track = shift;
+
+  my $conf = get_config();
+
+  my $sk = get_sk($ua, $conf->{core}->{user});
+
+  my %args = (
+    method  => 'track.scrobble',
+
+    # Let's be explicit
+    artist    => $track->{artist},
+    track     => $track->{title},
+    (exists $track->{album} ?
+     (album   => $track->{album}) : ()),
+
+    # Use current time if none is provided
+    timestamp => ($track->{time} // time()),
+
+    api_key => $conf->{api}->{key},
+    sk      => $sk
+  );
+
+  my $sig = make_api_signature($conf->{api}->{secret}, %args);
+  my $url = make_api_url(%args, api_sig => $sig);
+
+  # Technically, we should send the arguments as a
+  # POST body, but simply doing a POST with the args
+  # in the URL seems to work fine...
+  my $xml = api_request($ua, $url, 'POST');
+  print STDERR "\n$xml\n";
+  # my $data = decode_json $json;
+}
+
+sub get_ua {
+  my ($c_pkg, $c_fn) = caller;
+
+  my $ua = LWP::UserAgent->new(timeout => 10);
+  $ua->env_proxy;
+
+  $ua->agent("nanont-lastfm/0.1");
+
+  return $ua;
+}
+
+sub get_config {
+  # TODO: use XDG conventions
+  my $conf_path = "$ENV{HOME}/.config/lastfm-tools.conf";
+  unless (-e -f $conf_path) {
+    die "Missing config file! ($conf_path)\n";
+  }
+
+  my %config;
+
+  my @lines = split /\r?\n/, read_utf8($conf_path);
+  my $top_key;
+  for (@lines) {
+    if (/ \[ ([[:alnum:]]+) \] /x) {
+      # say STDERR "LABEL: {$1}";
+      $top_key = $1;
+    } elsif (/ ([[:alnum:]]+) \s* = \s* ([[:alnum:]]+) /x) {
+      # say STDERR "VAL: {$1} -> {$2}";
+      $config{$top_key}->{$1} = $2;
+    }
+  }
+
+  return \%config;
+}
+
+sub write_binary {
+  my $fn      = shift;
+  my $dataref = shift;
+
+  open(my $fh, '>', $fn) or croak "$!";
+  binmode $fh;
+  print $fh $$dataref;
+  close $fh;
+}
+
+sub write_utf8 {
+  my $fn  = shift;
+  my $str = shift;
+
+  # print STDERR "WRITE_UTF8: <<$str>>\n";
+
+  utf8::encode($str);
+  write_binary($fn, \$str);
+}
+
+sub read_binary {
+  my $fn = shift;
+
+  open(my $fh, '<', $fn) or croak "$!";
+  binmode $fh;
+  local $/ = undef;
+  my $bin = <$fh>;
+  close $fh;
+
+  return $bin;
+}
+
+sub read_utf8 {
+  my $fn = shift;
+
+  my $bin = read_binary($fn);
+  utf8::decode($bin);
+
+  return $bin;
+}
+
+# = BEGIN SCROBBLE-DAP =
+
+# Resources:
+# https://web.archive.org/web/20180315041951/ \
+#   http://www.audioscrobbler.net/wiki/Portable_Player_Logging
+
+sub validate_log {
+  my $logref = shift;
+
+  my %expected = (
+    0 => '#AUDIOSCROBBLER/1.1',
+    1 => '#TZ/UNKNOWN'
+  );
+
+  for my $i (sort keys %expected) {
+    my $exact_match = $expected{$i};
+
+    if ($logref->[$i] !~ /^\Q$exact_match\E$/) {
+      die sprintf("Expected <%s>, got <%s>\n",
+                  $exact_match, $logref->[$i]);
+    }
+  }
+
+  # The header is made up of 3 lines,
+  # so check if we have at least 4
+  if (scalar @{ $logref } < 4) {
+    die "Expecting at least one log entry\n";
+  }
+}
+
+sub new_track {
+  my ($artist, $album, $track,
+      $position, $duration, $rating,
+      $timestamp, $mbid) = @_;
+
+  my %track = (
+    artist => $artist,
+    album => $album,
+    track => $track,
+    position => $position,
+    duration => $duration,
+    rating => $rating,
+    timestamp => $timestamp,
+    mbid => $mbid
+  );
+
+  return \%track;
+}
+
+sub parse_log {
+  my @raw = @{ shift() };
+
+  # Remove the first three lines
+  splice @raw, 0, 3;
+
+  my @log =
+      map { new_track @{ $_ } }
+      # Break lines by tabs into track
+      map { [ split /\t/, $_ ] }
+      @raw;
+}
+
+sub scrobble_log {
+  my $ua     = shift;
+  my $logref = shift;
+
+  my @log = parse_log($logref);
+
+  # Ignore skipped tracks
+  my @listened = grep { $_->{rating} eq 'L' } @log;
+
+  for my $listen (@listened) {
+    # Consider time offset
+    my $tz_offset = +(60 * 60 * 2); # CEST: +2h
+
+    my $local_timestamp = $listen->{timestamp} - $tz_offset;
+
+    # Move relevant bits into a structure
+    # that Common::scrobble understands
+    # (Yes, this sucks bad.)
+
+    my $submission = {
+      artist => $listen->{artist},
+      title => $listen->{track},
+      album => $listen->{album},
+      time => $local_timestamp
+    };
+
+    scrobble($ua, $submission);
+  }
+
+  #p @listened;
+}
+
+sub maybe_delete_log {
+  my $file = shift;
+
+  my $bn = basename $file;
+
+  local $| = 1;
+  print "Delete logfile ($bn)? [y/N] ";
+
+  my $resp = <STDIN>;
+  if ($resp !~ /[yY]/) {
+    return;
+  }
+
+  if (unlink $file) {
+    print "Deleted: $file\n";
+  } else {
+    print "unlink failed: $file\n";
+  }
+}
+
+# = MAIN =
+
+sub main {
+  my $file;
+
+  local @_ = @ARGV;
+  while (local $_ = shift) {
+    if (/--?f(ile)?/) { $file = shift }
+    if (/--?h(elp)?/) { pod2usage(1) }
+  }
+
+  unless (defined $file) {
+    pod2usage "Missing: --file";
+  }
+
+  my @log = split /\n/, read_utf8($file);
+  validate_log(\@log);
+
+  my $ua = get_ua;
+  scrobble_log($ua, \@log);
+
+  maybe_delete_log($file);
+}
+
+main;
+
+__END__
+
+=head1 lastfm-scrobble-dap
+
+Submit a scrobble log (e.g. from Rockbox) to Last.fm.
+
+=head1 SYNOPSIS
+
+  lastfm-scrobble-dap [options]
+
+  Options:
+        -f PATH
+    --file PATH     Path to log file.
