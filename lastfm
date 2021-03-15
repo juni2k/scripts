@@ -320,13 +320,13 @@ sub read_utf8 {
   return $bin;
 }
 
-# = BEGIN SCROBBLE-DAP =
+# = BEGIN DAP FUNCTIONS =
 
 # Resources:
 # https://web.archive.org/web/20180315041951/ \
 #   http://www.audioscrobbler.net/wiki/Portable_Player_Logging
 
-sub validate_log {
+sub dap_validate_log {
   my $logref = shift;
 
   my %expected = (
@@ -350,7 +350,7 @@ sub validate_log {
   }
 }
 
-sub new_track {
+sub dap_new_track {
   my ($artist, $album, $track,
       $position, $duration, $rating,
       $timestamp, $mbid) = @_;
@@ -369,24 +369,24 @@ sub new_track {
   return \%track;
 }
 
-sub parse_log {
+sub dap_parse_log {
   my @raw = @{ shift() };
 
   # Remove the first three lines
   splice @raw, 0, 3;
 
   my @log =
-      map { new_track @{ $_ } }
+      map { dap_new_track @{ $_ } }
       # Break lines by tabs into track
       map { [ split /\t/, $_ ] }
       @raw;
 }
 
-sub scrobble_log {
+sub dap_scrobble_log {
   my $ua     = shift;
   my $logref = shift;
 
-  my @log = parse_log($logref);
+  my @log = dap_parse_log($logref);
 
   # Ignore skipped tracks
   my @listened = grep { $_->{rating} eq 'L' } @log;
@@ -414,7 +414,7 @@ sub scrobble_log {
   #p @listened;
 }
 
-sub maybe_delete_log {
+sub dap_maybe_delete_log {
   my $file = shift;
 
   my $bn = basename $file;
@@ -450,12 +450,12 @@ sub main {
   }
 
   my @log = split /\n/, read_utf8($file);
-  validate_log(\@log);
+  dap_validate_log(\@log);
 
   my $ua = get_ua;
-  scrobble_log($ua, \@log);
+  dap_scrobble_log($ua, \@log);
 
-  maybe_delete_log($file);
+  dap_maybe_delete_log($file);
 }
 
 main;
