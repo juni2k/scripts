@@ -350,7 +350,7 @@ sub dap_validate_log {
   }
 }
 
-sub dap_new_track {
+sub dap_make_track {
   my ($artist, $album, $track,
       $position, $duration, $rating,
       $timestamp, $mbid) = @_;
@@ -376,7 +376,7 @@ sub dap_parse_log {
   splice @raw, 0, 3;
 
   my @log =
-      map { dap_new_track @{ $_ } }
+      map { dap_make_track @{ $_ } }
       # Break lines by tabs into track
       map { [ split /\t/, $_ ] }
       @raw;
