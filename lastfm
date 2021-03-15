@@ -434,15 +434,14 @@ sub dap_maybe_delete_log {
   }
 }
 
-# = MAIN =
+# = TASK RUNNER =
 
-sub main {
+sub task_scrobble_dap {
+  my @args = @_;
+
   my $file;
-
-  local @_ = @ARGV;
-  while (local $_ = shift) {
-    if (/--?f(ile)?/) { $file = shift }
-    if (/--?h(elp)?/) { pod2usage(1) }
+  while (local $_ = shift @args) {
+    if (/--?f(ile)?/) { $file = shift @args }
   }
 
   unless (defined $file) {
@@ -458,18 +457,46 @@ sub main {
   dap_maybe_delete_log($file);
 }
 
+
+# = MAIN =
+
+sub main {
+  my @cli_argv = @ARGV;
+
+  if (scalar(@cli_argv) == 0 or
+        $cli_argv[0] =~ /--?h(elp)?/) { pod2usage(1) } # exits
+
+  my $tasks = {
+    'scrobble-dap' => \&task_scrobble_dap
+  };
+
+  my $selection = shift @cli_argv;
+  if (exists $tasks->{$selection}) {
+    $tasks->{$selection}->(@cli_argv);
+  } else {
+    local $" = ', ';
+    my @available = sort keys %{ $tasks };
+    die "Task not found: $selection (try: @available)\n";
+  }
+}
+
 main;
 
 __END__
 
-=head1 lastfm-scrobble-dap
+=head1 lastfm
 
 Submit a scrobble log (e.g. from Rockbox) to Last.fm.
 
 =head1 SYNOPSIS
 
-  lastfm-scrobble-dap [options]
+  lastfm TASK [task-specific options]
 
-  Options:
-        -f PATH
-    --file PATH     Path to log file.
+  Available TASKs are:
+
+    scrobble-dap
+      Use this to submit scrobbler.log files from your mp3 player.
+
+      Options:
+            -f PATH
+        --file PATH     Path to log file.
