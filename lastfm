@@ -218,7 +218,7 @@ sub scrobble {
   my $sk = get_sk($ua, $conf->{core}->{user});
 
   my %args = (
-    method  => 'track.scrobble',
+    method    => 'track.scrobble',
 
     # Let's be explicit
     artist    => $track->{artist},
@@ -229,8 +229,8 @@ sub scrobble {
     # Use current time if none is provided
     timestamp => ($track->{time} // time()),
 
-    api_key => $conf->{api}->{key},
-    sk      => $sk
+    api_key   => $conf->{api}->{key},
+    sk        => $sk
   );
 
   my $sig = make_api_signature($conf->{api}->{secret}, %args);
@@ -356,14 +356,14 @@ sub dap_make_track {
       $timestamp, $mbid) = @_;
 
   my %track = (
-    artist => $artist,
-    album => $album,
-    track => $track,
-    position => $position,
-    duration => $duration,
-    rating => $rating,
+    artist    => $artist,
+    album     => $album,
+    track     => $track,
+    position  => $position,
+    duration  => $duration,
+    rating    => $rating,
     timestamp => $timestamp,
-    mbid => $mbid
+    mbid      => $mbid
   );
 
   return \%track;
@@ -402,10 +402,10 @@ sub dap_scrobble_log {
     # (Yes, this sucks bad.)
 
     my $submission = {
-      artist => $listen->{artist},
-      title => $listen->{track},
-      album => $listen->{album},
-      time => $local_timestamp
+      artist       => $listen->{artist},
+      title        => $listen->{track},
+      album        => $listen->{album},
+      time         => $local_timestamp
     };
 
     scrobble($ua, $submission);
