@@ -14,7 +14,9 @@ use Digest::MD5    qw{md5_hex};
 use Encode         qw{decode};
 use File::Basename qw{basename dirname};
 use File::Path     qw{make_path};
+use IPC::Open3     qw{open3};
 use Pod::Usage     qw{pod2usage};
+use Symbol         qw{gensym};
 
 use LWP::UserAgent qw{};
 use JSON           qw{decode_json};
@@ -434,6 +436,74 @@ sub dap_maybe_delete_log {
   }
 }
 
+# = BEGIN STATION FUNCTIONS =
+
+my $station_now;
+station_clear_now($station_now);
+
+sub station_update_now {
+  my $artist = shift;
+  my $title  = shift;
+
+  $station_now = {artist => $artist, title => $title};
+}
+
+sub station_pending_now {
+  my $artist = shift;
+  my $title  = shift;
+
+  if (station_clearp_now($station_now) or
+        ($station_now->{artist} ne $artist) or
+        ($station_now->{title} ne $title)) {
+    return 1;
+  }
+
+  return 0;
+}
+
+sub station_clear_now {
+  my $station_now = undef;
+}
+
+sub station_clearp_now {
+  return !(defined $station_now);
+}
+
+sub station_scrobble_now {
+  if (!(station_clearp_now($station_now))) {
+    scrobble(get_ua(), $station_now);
+  }
+
+  station_clear_now();
+}
+
+sub station_handle_ok {
+  my $fh_out = shift;
+  my $fh_err = shift;
+
+  my $artist = readline $fh_out;
+  my $title  = readline $fh_out;
+
+  chomp($artist, $title);
+
+  if (station_pending_now($artist, $title)) {
+    station_scrobble_now;
+  }
+
+  station_update_now($artist, $title);
+};
+
+sub station_handle_skip {
+  station_scrobble_now;
+}
+
+sub station_handle_error {
+  my $fh_out = shift;
+  my $fh_err = shift;
+
+  station_scrobble_now;
+}
+
 # = TASK RUNNER =
 
 sub task_scrobble_dap {
@@ -457,6 +527,43 @@ sub task_scrobble_dap {
   dap_maybe_delete_log($file);
 }
 
+sub task_scrobble_station {
+  my @args = @_;
+
+  my $station = shift @args;
+  my $script = "$ENV{HOME}/.nanont-lastfm/stations/$station"; # TODO improve
+
+  if (!(-e -f -x $script)) {
+    print STDERR "Provider does not exist or is not executable\n";
+    print STDERR "(Looked for: $script)\n";
+    exit -1;
+  }
+
+  print STDOUT "Listening to $station ...\n";
+  while (1) {
+
+    my $pid = open3(my $s_in, my $s_out, my $s_err = gensym,
+                    $script);
+    waitpid($pid, 0);
+    my $rc = $? >> 8;
+
+    my $handlers = {
+      OK   =>  \&station_handle_ok,
+      SKIP =>  \&station_handle_skip,
+      ERROR => \&station_handle_error
+    };
+
+    my $status = readline $s_out;
+    chomp $status;
+    if (exists $handlers->{$status}) {
+      $handlers->{$status}->($s_out, $s_err);
+    } else {
+      die "Station Provider not working as intended (status: $status)\n";
+    }
+
+    sleep 30;
+  }
+}
 
 # = MAIN =
 
@@ -467,7 +574,8 @@ sub main {
         $cli_argv[0] =~ /--?h(elp)?/) { pod2usage(1) } # exits
 
   my $tasks = {
-    'scrobble-dap' => \&task_scrobble_dap
+    'scrobble-dap'     => \&task_scrobble_dap,
+    'scrobble-station' => \&task_scrobble_station
   };
 
   my $selection = shift @cli_argv;
@@ -500,3 +608,12 @@ Submit a scrobble log (e.g. from Rockbox) to Last.fm.
       Options:
             -f PATH
         --file PATH     Path to log file.
+
+    scrobble-station
+      Scrobble from a radio station or other sources.
+
+      Options:
+        NAME     Name of the station provider binary.
+
+      Example:
+        lastfm scrobble-station fm4
