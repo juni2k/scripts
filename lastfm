@@ -30,6 +30,7 @@ $Data::Dumper::Maxdepth = 2;
 $Data::Dumper::Sortkeys = 1;
 
 my $api_base = 'https://ws.audioscrobbler.com/2.0/';
+my $debug = 0;
 
 sub make_api_url {
   return $api_base unless @_;
@@ -446,15 +447,29 @@ sub station_update_now {
   my $title  = shift;
 
   $station_now = {artist => $artist, title => $title};
+
+  if ($debug) {
+    print STDERR "Update!\n";
+    print STDERR Dumper($station_now);
+  }
 }
 
 sub station_pending_now {
   my $artist = shift;
   my $title  = shift;
 
-  if (station_clearp_now($station_now) or
-        ($station_now->{artist} ne $artist) or
+  if (station_clearp_now($station_now)) {
+    return 0;
+  }
+
+  if (($station_now->{artist} ne $artist) or
         ($station_now->{title} ne $title)) {
+    if ($debug) {
+      printf STDERR "Pending! (%s = %s | %s = %s)\n",
+        $station_now->{artist}, $artist,
+        $station_now->{title}, $title;
+    }
+
     return 1;
   }
 
@@ -470,7 +485,10 @@ sub station_clearp_now {
 }
 
 sub station_scrobble_now {
-  if (!(station_clearp_now($station_now))) {
+  if ($debug) {
+    printf "station_clearp_now: %d\n", station_clearp_now();
+  }
+  if (!(station_clearp_now())) {
     scrobble(get_ua(), $station_now);
   }
 
