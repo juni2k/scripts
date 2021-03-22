@@ -243,8 +243,23 @@ sub scrobble {
   # POST body, but simply doing a POST with the args
   # in the URL seems to work fine...
   my $xml = api_request($ua, $url, 'POST');
-  print STDERR "\n$xml\n";
-  # my $data = decode_json $json;
+  my $dom = XML::LibXML->load_xml(string => $xml);
+
+  my $status = $dom->find('//lfm/@status');
+  if ($status ne 'ok') {
+    die "LastFM: not ok\n" . $xml;
+  }
+
+  # It is ok to check for exactly 1 accepted scrobble since
+  # we're never scrobbling multiple tracks in a batch.
+  # Also, we do string comparison since LibXML does not seem
+  # to overload the != operator, ugh.
+  my $accepted = $dom->find('//lfm/scrobbles/@accepted');
+  if ($accepted ne '1') {
+    warn "LastFM: not accepted\n" . $xml;
+  }
+
+  return 1;
 }
 
 sub get_ua {
