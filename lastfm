@@ -477,7 +477,7 @@ sub station_pending_now {
 }
 
 sub station_clear_now {
-  my $station_now = undef;
+  $station_now = undef;
 }
 
 sub station_clearp_now {
