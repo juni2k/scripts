@@ -577,6 +577,7 @@ sub task_scrobble_station {
 
     my $pid = open3(my $s_in, my $s_out, my $s_err = gensym,
                     $script);
+    binmode($_, ':encoding(UTF-8)') for ($s_in, $s_out, $s_err);
     waitpid($pid, 0);
     my $rc = $? >> 8;
 
