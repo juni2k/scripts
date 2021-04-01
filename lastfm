@@ -213,8 +213,9 @@ sub get_sk {
 }
 
 sub scrobble {
-  my $ua    = shift;
-  my $track = shift;
+  my $ua         = shift;
+  my $track      = shift;
+  my $success_cb = shift;
 
   my $conf = get_config();
 
@@ -257,6 +258,10 @@ sub scrobble {
   my $accepted = $dom->find('//lfm/scrobbles/@accepted');
   if ($accepted ne '1') {
     warn "LastFM: not accepted\n" . $xml;
+  }
+
+  if (defined $success_cb) {
+    $success_cb->($track);
   }
 
   return 1;
@@ -400,6 +405,12 @@ sub dap_parse_log {
       @raw;
 }
 
+sub dap_scrobble_success {
+  my $track = shift;
+
+  print "Scrobbled: $track->{artist} - $track->{title}\n";
+}
+
 sub dap_scrobble_log {
   my $ua     = shift;
   my $logref = shift;
@@ -426,7 +437,7 @@ sub dap_scrobble_log {
       time         => $local_timestamp
     };
 
-    scrobble($ua, $submission);
+    scrobble($ua, $submission, \&dap_scrobble_success);
   }
 
   #p @listened;
