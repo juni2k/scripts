@@ -550,6 +550,37 @@ sub station_handle_error {
 
 # = TASK RUNNER =
 
+sub task_scrobble {
+  my @args = @_;
+
+  print "Artist > ";
+  my $artist = <STDIN>;
+
+  print "Title > ";
+  my $title = <STDIN>;
+
+  chomp($artist, $title);
+
+  if ($artist eq '' or $title eq '') {
+    print STDERR "Artist and Title are required.\n";
+    exit -1;
+  }
+
+  print "Album (optional) > ";
+  my $album = <STDIN>;
+  chomp($album);
+
+  my $submission = {
+    artist => $artist,
+    title  => $title,
+    ($album ne ''      ?
+     (album => $album) : ())
+  };
+
+  my $ua = get_ua;
+  scrobble($ua, $submission);
+}
+
 sub task_scrobble_dap {
   my @args = @_;
 
@@ -619,6 +650,7 @@ sub main {
         $cli_argv[0] =~ /--?h(elp)?/) { pod2usage(1) } # exits
 
   my $tasks = {
+    'scrobble'         => \&task_scrobble,
     'scrobble-dap'     => \&task_scrobble_dap,
     'scrobble-station' => \&task_scrobble_station
   };
@@ -646,6 +678,9 @@ Submit a scrobble log (e.g. from Rockbox) to Last.fm.
   lastfm TASK [task-specific options]
 
   Available TASKs are:
+
+    scrobble
+      Scrobble a single track. Interactive.
 
     scrobble-dap
       Use this to submit scrobbler.log files from your mp3 player.
