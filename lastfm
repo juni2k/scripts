@@ -267,6 +267,12 @@ sub scrobble {
   return 1;
 }
 
+sub scrobble_success_cb {
+  my $track = shift;
+
+  print "Scrobbled: $track->{artist} - $track->{title}\n";
+}
+
 sub get_ua {
   my ($c_pkg, $c_fn) = caller;
 
@@ -405,12 +411,6 @@ sub dap_parse_log {
       @raw;
 }
 
-sub dap_scrobble_success {
-  my $track = shift;
-
-  print "Scrobbled: $track->{artist} - $track->{title}\n";
-}
-
 sub dap_scrobble_log {
   my $ua     = shift;
   my $logref = shift;
@@ -437,7 +437,7 @@ sub dap_scrobble_log {
       time         => $local_timestamp
     };
 
-    scrobble($ua, $submission, \&dap_scrobble_success);
+    scrobble($ua, $submission, \&scrobble_success_cb);
   }
 
   #p @listened;
@@ -578,7 +578,7 @@ sub task_scrobble {
   };
 
   my $ua = get_ua;
-  scrobble($ua, $submission);
+  scrobble($ua, $submission, \&scrobble_success_cb);
 }
 
 sub task_scrobble_dap {
