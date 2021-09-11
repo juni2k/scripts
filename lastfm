@@ -641,6 +641,27 @@ sub task_scrobble_station {
   }
 }
 
+sub task_recent {
+  my $ua = get_ua;
+  my $conf = get_config;
+
+  my $url = make_api_url(method  => 'user.getrecenttracks',
+                         user    => 'nanont',
+                         limit   => 10,
+                         api_key => $conf->{api}->{key});
+
+  my $xml = api_request($ua, $url);
+  my $doc = XML::LibXML->load_xml(string => $xml);
+  # say $doc;
+  my @tracks = $doc->findnodes(q(//lfm/recenttracks/track));
+
+  for my $t (@tracks) {
+    printf "%s - %s\n",
+        $t->find(q(./artist/text())),
+        $t->find(q(./name/text()));
+  }
+}
+
 # = MAIN =
 
 sub main {
@@ -652,7 +673,8 @@ sub main {
   my $tasks = {
     'scrobble'         => \&task_scrobble,
     'scrobble-dap'     => \&task_scrobble_dap,
-    'scrobble-station' => \&task_scrobble_station
+    'scrobble-station' => \&task_scrobble_station,
+    'recent'           => \&task_recent
   };
 
   my $selection = shift @cli_argv;
@@ -697,3 +719,6 @@ Submit a scrobble log (e.g. from Rockbox) to Last.fm.
 
       Example:
         lastfm scrobble-station fm4
+
+    recent
+      Show the 10 most recent scrobbles.
