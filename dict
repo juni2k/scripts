@@ -61,9 +61,11 @@ EOF
 }
 
 sub main {
-  if (!(scalar @ARGV) or $ARGV[0] =~ /--?h(elp)?/) {
-    show_help;
-    exit;
+  for (@ARGV) {
+    if (/^--?h(elp)?$/) {
+      show_help;
+      exit;
+    }
   }
 
   lookup(@ARGV);
