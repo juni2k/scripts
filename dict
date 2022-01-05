@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# martin, 2018-12-10, 2019-01-12, 2019-06-30, 2020-12-20
+# martin, 2018-12-10, 2019-01-12, 2019-06-30, 2020-12-20, 2022-01-05
 # ... ask dict.cc for a translation
 
 use strict;
@@ -8,7 +8,7 @@ use v5;
 
 use Encode;
 
-use Mojo::UserAgent;
+use LWP::UserAgent;
 use URI::Escape;
 
 use open qw(:std :utf8);
@@ -17,7 +17,6 @@ sub fetch_list {
   my ($htmlref, $id) = @_;
 
   return
-    map  { decode('UTF-8', $_) }
     grep { $_ ne '' }
     map  { s/\\'/'/g; $_ }
     map  { s/(^"|"$)//g; $_ }
@@ -30,13 +29,14 @@ sub lookup {
   my $term = join(' ', @_);
   my $url = 'https://www.dict.cc/?s=' . uri_escape($term);
 
-  my $res = Mojo::UserAgent->new->get($url)->res;
+  my $ua = LWP::UserAgent->new(agent => 'junidict/1.0');
+  my $res = $ua->get($url);
 
-  if ($res->code != 200) {
+  if (!$res->is_success) {
     die "dict.cc returned: " . $res->code . "\n";
   }
 
-  my $html = $res->body;
+  my $html = $res->decoded_content;
 
   my @xs1 = fetch_list(\$html, 1);
   my @xs2 = fetch_list(\$html, 2);
