@@ -1,25 +1,29 @@
 #!/usr/bin/env perl
 
-# martin, 2019-03-20
+# martin, 2019-03-20, 2022-01-08
 # probes if the client is connected to mullvad.net
 
 use strict;
 use warnings;
 use v5;
 
-use JSON::PP qw[decode_json];
+use JSON qw{decode_json};
+use LWP::UserAgent;
 
 my $probe_url = 'https://am.i.mullvad.net/json';
-my @curl = qw[curl -s]; # /bin/curl, etc.
 
 sub main {
   binmode(STDIN,  ':utf8');
   binmode(STDOUT, ':utf8');
   binmode(STDERR, ':utf8'); 
 
-  my $json = qx[@curl $probe_url];
-  die "fail: $?" unless $? == 0;
+  my $ua = LWP::UserAgent->new(agent => 'juniprobe/1.0');
+  my $res = $ua->get($probe_url);
+  if (!$res->is_success) {
+    die "Fail: " . $res->status_line;
+  }
 
+  my $json = $res->decoded_content;
   my %res = %{decode_json($json)};
 
   unless ($res{mullvad_exit_ip}) {
