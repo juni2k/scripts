@@ -67,6 +67,10 @@ sub rename_file {
 
   print "[Rename:] $fn => $newpath\n";
 
+  if (-e $newpath) {
+    die "Fatal: $newpath already exists!\n";
+  }
+
   if (!$dry) {
     move($fn, $newpath);
   }
