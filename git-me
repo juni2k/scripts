@@ -1,52 +1,8 @@
-#!/usr/bin/env perl
-# martin, 2018-12-20, 2019-01-12, 2019-11-17, 2019-11-19
+#!/bin/sh
+# martin, 2018-12-20, 2019-01-12, 2019-11-17, 2019-11-19, 2022-03-24
 # locates and prints committer info from .git/config
 
-use strict;
-use warnings;
-use utf8;
+NAME=$(git config --get user.name)
+EMAIL=$(git config --get user.email)
 
-sub extract_committer {
-  my (@lines) = split(/\n/, shift);
-
-  my (%config, $current_key);
-  for (@lines) {
-    if (/^\[(.*?)\]$/) {
-      # like: "[core]"
-      $current_key = $1;
-    } elsif (/^\s*(.*?) = (.*?)$/) {
-      # like: "    bare = false"
-      $config{$current_key}->{$1} = $2;
-    }
-  }
-
-  unless (defined $config{user}->{email}
-          && defined $config{user}->{name}) {
-    die "There is no user defined in .git/config\n"
-  }
-
-  return $config{user}->%*;
-}
-
-my $data = do {
-  local $/ = undef;
-
-  my $root = `git rev-parse --show-toplevel`;
-  if ($? != 0) {
-    die "Fatal: $!";
-  }
-  $root =~ s/[\r\n]$//g;
-
-  my $fn = $root . '/.git/config';
-  unless (-e $fn) {
-    die "File $fn does not exist\n";
-  }
-  open(my $fh, '<:encoding(UTF-8)', $fn) or die "$!";
-  my $d = <$fh>;
-  close($d);
-
-  $d
-};
-
-my %committer = extract_committer($data);
-print "$committer{name} <$committer{email}>\n";
+echo "${NAME} <${EMAIL}>"
